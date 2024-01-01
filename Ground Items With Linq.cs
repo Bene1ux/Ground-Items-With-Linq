@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Reflection;
 using Color = SharpDX.Color;
 using RectangleF = SharpDX.RectangleF;
@@ -25,14 +26,37 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
     public static Graphics _graphics;
     private readonly Stopwatch _timer = Stopwatch.StartNew();
     private readonly HashSet<CustomItemData> _storedCustomItems = [];
+    private HashSet<long> processedItems = new HashSet<long>();
+    private ItemCounts itemCounts = new ItemCounts();
+    private ItemCounts itemCountsTotal = new ItemCounts();
 
     private List<ItemFilter> _itemFilters;
     private Element _largeMap;
     public Dictionary<string, List<string>> UniqueArtMapping = [];
 
+    private List<string> t0list = new() { "Headhunter", "MirrorRing", "InjectorBelt", "Dagger7unique", "Alexaxe", "Reefbane", "Voidshaft", "BinosKitchenKnife", "CaspirosResonance", "RakiataSword", "TwoHandMace2unique2" };
+    private List<string> droppedT0 = new();
+
     public Ground_Items_With_Linq()
     {
         Name = "Ground Items With Linq";
+    }
+
+    class ItemCounts
+    {
+        public int unique;
+        public int currency;
+        public int divination;
+        public int any;
+        public int t0;
+        public void Clear()
+        {
+            unique = 0;
+            currency = 0;
+            divination = 0;
+            any = 0;
+            t0 = 0;
+        }
     }
 
     public override bool Initialise()
@@ -52,6 +76,8 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
                 );
             }
         };
+
+        File.AppendAllText("t0.txt", "-\t-\t-\t-\t-\n");
 
         Settings.UniqueIdentificationSettings.IgnoreGameUniqueArtMapping.OnValueChanged += (_, _) =>
         {
@@ -103,7 +129,7 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
         }
 
         var customFilePath = Path.Join(DirectoryFullName, CustomUniqueArtMappingPath);
-       // LogMessage($"********PATH {customFilePath}");
+        // LogMessage($"********PATH {customFilePath}");
 
         if (File.Exists(customFilePath))
         {
@@ -136,8 +162,8 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
             {
                 if (Settings.Debug)
                 {
-                    LogMessage($"Embedded stream {DefaultUniqueArtMappingPath} is missing xdd");
-                    File.WriteAllText("xdd.txt", "sadf");
+                   // LogMessage($"Embedded stream {DefaultUniqueArtMappingPath} is missing xdd");
+                    //File.WriteAllText("xdd.txt", "sadf");
                 }
 
                 return null;
@@ -165,6 +191,8 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
 
     public override void AreaChange(AreaInstance area)
     {
+        itemCounts.Clear();
+        droppedT0.Clear();
         UniqueArtMapping = GetUniqueArtMapping();
         _storedCustomItems.Clear();
     }
@@ -193,6 +221,9 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
             return;
         }
 
+        Graphics.DrawText($"{itemCounts.unique}(U)\t{itemCounts.currency}(C)\t{itemCounts.divination}(D)\t{itemCounts.t0}(T0)\t({itemCounts.any})", new Vector2(Settings.ItemCountX, Settings.ItemCountY));
+        Graphics.DrawText($"{itemCountsTotal.unique}(U)\t{itemCountsTotal.currency}(C)\t{itemCountsTotal.divination}(D)\t{itemCountsTotal.t0}(T0)\t({itemCountsTotal.any})", new Vector2(Settings.ItemCountX, Settings.ItemCountY + 20));
+        Graphics.DrawText($"{string.Join(',',droppedT0)}", new Vector2(Settings.ItemCountX, Settings.ItemCountY + 40));
         //var socketColors = new List<string>();
 
         //if (GameController.IngameState.UIHover is { Address: not 0 } h && h.Entity.IsValid)
@@ -226,7 +257,7 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
                           .Where(item => item.IsWanted == true)
                           .ToList();
         }
-       // render1.Stop();
+        // render1.Stop();
 
         if (wantedItems.Count <= 0)
         {
@@ -266,7 +297,7 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
                     {
                         Graphics.DrawFrame(entity.Rect, Color.Red, 5);
                     }
-                  
+
                     position = DrawText(
                         playerPos,
                         position,
@@ -320,7 +351,7 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
         {
             singleRowTextHeight = Graphics.MeasureText("aAyY").Y;
         }
-        
+
         var enableSocketDisplay = sockets > 0 && Settings.SocketDisplaySettings.ShowSockets;
 
         int socketWidth;
@@ -357,7 +388,7 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
         var isDefaultFont = string.IsNullOrEmpty(Settings.FontOverride.Value);
         var baseTextSize = isDefaultFont
             ? Graphics.MeasureText(text)
-            : Graphics.MeasureText(text,14);//, Settings.FontOverride.Value);
+            : Graphics.MeasureText(text, 14);//, Settings.FontOverride.Value);
         float actualTextScale = isDefaultFont || Settings.ScaleFontWhenCustom
             ? Settings.TextSize
             : 1;
@@ -382,8 +413,8 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
             var textPos = position + new Vector2N(-socketAreaWidth, fullHeight / 2 - textSize.Y / 2);
 
             float DrawLine(string line, Vector2N pos) =>
-                isDefaultFont 
-                    ? Graphics.DrawText(line, pos, drawStyle.TextColor, FontAlign.Right).Y 
+                isDefaultFont
+                    ? Graphics.DrawText(line, pos, drawStyle.TextColor, FontAlign.Right).Y
                     : Graphics.DrawText(line, pos, drawStyle.TextColor, Settings.FontOverride.Value, FontAlign.Right).Y;
 
             if (Settings.AlignItemTextToCenter)
@@ -392,7 +423,7 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
                 {
                     var lineSize = isDefaultFont
                         ? Graphics.MeasureText(line)
-                        : Graphics.MeasureText(line,14);//, Settings.FontOverride.Value);
+                        : Graphics.MeasureText(line, 14);//, Settings.FontOverride.Value);
                     textPos.Y += DrawLine(line, textPos + new Vector2N(-textSize.X / 2 + lineSize.X / 2, 0));
                 }
             }
@@ -430,6 +461,55 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
 
     private void UpdateStoredItems(bool forceUpdate) => UpdateStoredItems(forceUpdate, false);
 
+    private void UpdateCounts(ExileCore.PoEMemory.MemoryObjects.Entity item, ItemCounts counts, bool writeToFile=false)
+    {
+
+        counts.any++;
+
+
+        var text = item?.GetComponent<RenderItem>()?.ResourcePath;
+        var rarity = item?.GetComponent<Mods>()?.ItemRarity;
+
+        //LogMessage($"Item:{text}");
+        //if (rarity == null)
+        //{
+        //    return;
+        //}
+
+        if (ItemRarity.Unique.Equals(rarity))
+        {
+            counts.unique++;
+
+        }
+        if (text == null)
+        {
+            return;
+        }
+
+        if (text.Contains("Currency"))
+        {
+
+            counts.currency++;
+
+        }
+        else if (text.Contains("Divination"))
+        {
+
+            counts.divination++;
+
+        }
+        if (t0list.Any(text.Contains))
+        {
+            counts.t0++;
+            if (writeToFile)
+            {
+                var itemName = string.Join('/', UniqueArtMapping[text]);
+                droppedT0.Add(itemName);
+                File.AppendAllText("t0.txt", $"{itemName}\t{counts.t0}\t{counts.unique}\t{counts.any}\t{DateTime.Now}\n");
+            }
+        }
+    }
+
     private void UpdateStoredItems(bool forceUpdate, bool doProfiler)
     {
         if (_timer.ElapsedMilliseconds <= Settings.UpdateTimer && !forceUpdate)
@@ -452,9 +532,29 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
             //var existingItemAddresses = new HashSet<uint>(_storedCustomItems.Select(item => item.ItemId));
 
             foreach (var entity in validWorldItems)
+            {
+                if (entity.ItemOnGround == null)
+                {
+                    continue;
+                }
+
+                var itemEntity = entity?.ItemOnGround?.GetComponent<WorldItem>()?.ItemEntity;
+                if (itemEntity is null)
+                {
+                    continue;
+                }
+
+                if (!processedItems.Contains(entity.ItemOnGround.Id))
+                {
+                    processedItems.Add(entity.ItemOnGround.Id);
+                    UpdateCounts(itemEntity, itemCounts);
+                    UpdateCounts(itemEntity, itemCountsTotal,true);
+                }
+
+
                 if (!existingItemAddresses.Contains(entity.Address) &&
-                //if (!existingItemAddresses.Contains(entity.ItemOnGround.Id) &&
-                    entity.ItemOnGround.TryGetComponent<WorldItem>(out var worldItem))
+                        //if (!existingItemAddresses.Contains(entity.ItemOnGround.Id) &&
+                        entity.ItemOnGround.TryGetComponent<WorldItem>(out var worldItem))
                 {
                     var newItem = new CustomItemData(
                             worldItem.ItemEntity,
@@ -465,6 +565,7 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
                         );
                     _storedCustomItems.Add(newItem);
                 }
+            }
         }
 
         profilerModifyStored?.Stop();
@@ -488,7 +589,7 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
 
             item.IsWanted ??= ItemInFilter(item);
 
-            if (item.IsWanted??false)
+            if (item.IsWanted ?? false)
             {
                 item.PrepareForDrawingAndPlaySound();
             }
@@ -542,7 +643,7 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
                 .Select(line => line.Split('|'))
                 .Where(columns => columns.Length == 4)
                 .Select(columns => columns.Select(c => c.Trim().Length).ToList())
-                .Aggregate((int[]) [0, 0, 0, 0], (max, columns) => max.Zip(columns, Math.Max).ToArray());
+                .Aggregate((int[])[0, 0, 0, 0], (max, columns) => max.Zip(columns, Math.Max).ToArray());
         }
 
         string FormatLine(string line, IReadOnlyList<int> widths)
@@ -706,7 +807,7 @@ public class Ground_Items_With_Linq : BaseSettingsPlugin<Ground_Items_With_LinqS
 
         if (ImGui.Button("Clear StoredCustomItems and ReRun (PROFILER)"))
         {
-             _storedCustomItems.Clear();
+            _storedCustomItems.Clear();
             UpdateStoredItems(true, true);
         }
 

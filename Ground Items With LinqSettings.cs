@@ -12,6 +12,8 @@ public class Ground_Items_With_LinqSettings : ISettings
 {
     //Mandatory setting to allow enabling/disabling your plugin
     public ToggleNode Enable { get; set; } = new(false);
+    public RangeNode<int> ItemCountX { get; set; } = new(300, 0, 1920);
+    public RangeNode<int> ItemCountY { get; set; } = new(100, 0, 1080);
 
     [Menu(null, "Display debug strings")]
     public ToggleNode Debug { get; set; } = new(false);
